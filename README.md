@@ -96,8 +96,8 @@ https://www.python.org/downloads/
 If the project is hosted on GitHub:
 
 ```bash
-git clone <https://github.com/thonos-cpu/Temp_Hum_Prediction_Model>
-cd <Temp_Hum_Prediction_Model>
+git clone https://github.com/thonos-cpu/Temp_Hum_Prediction_Model
+cd Temp_Hum_Prediction_Model
 ```
 
 If you downloaded a ZIP file, extract it and open a terminal inside the project folder.
