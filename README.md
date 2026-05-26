@@ -1,6 +1,6 @@
 # IoT Sensor Data Preprocessing, Feature Engineering, and Forecasting
 
-This repository contains a Jupyter notebook for preprocessing IoT environmental sensor data, engineering time-series features, and benchmarking forecasting models for temperature, humidity, and 
+This repository contains a Jupyter notebook for preprocessing IoT environmental sensor data, engineering time-series features, and benchmarking forecasting models for temperature, humidity, and light.
 
 Notebook: `preproccess.ipynb`
 
