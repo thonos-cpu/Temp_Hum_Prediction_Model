@@ -8,7 +8,7 @@ Notebook: `preproccess.ipynb`
 
 The notebook is an end-to-end IoT time-series pipeline. It loads MongoDB records, cleans timestamp irregularities, removes outliers, interpolates missing measurements, builds predictive features, analyzes feature importance, and evaluates both linear regression and SARIMAX forecasting models.
 
-Core stages:
+Core stages  :
 
 1. MongoDB ingestion.
 2. Timestamp normalization and gap repair.
