@@ -1,46 +1,27 @@
 # IoT Sensor Data Preprocessing, Feature Engineering, and Forecasting
 
-This repository contains a Jupyter notebook for cleaning, enriching, analyzing, and forecasting time-series data collected from an IoT environmental sensing setup. The workflow is centered on measurements stored in MongoDB and produces a cleaned sensor dataset, engineered features, correlation diagnostics, visual reports, and forecasting benchmarks for temperature, humidity, and light.
+This repository contains a Jupyter notebook for preprocessing IoT environmental sensor data, engineering time-series features, and benchmarking forecasting models for temperature, humidity, and light.
 
-The notebook file is:
-
-```text
-preproccess.ipynb
-```
+Notebook: `preproccess.ipynb`
 
 ## What The Notebook Does
 
-The notebook implements an end-to-end data science pipeline for IoT telemetry. It starts by loading raw sensor records from MongoDB, removes known invalid readings, repairs irregular sampling intervals, filters statistical outliers, generates predictive features, evaluates feature usefulness, and trains time-series forecasting models.
+The notebook is an end-to-end IoT time-series pipeline. It loads MongoDB records, cleans timestamp irregularities, removes outliers, interpolates missing measurements, builds predictive features, analyzes feature importance, and evaluates both linear regression and SARIMAX forecasting models.
 
-At a high level, the workflow performs the following stages:
+Core stages:
 
-1. Connects to a MongoDB collection using environment variables.
-2. Loads sensor documents into a Pandas DataFrame.
-3. Removes MongoDB `_id` values from the analysis dataset.
-4. Converts timestamps into timezone-aware datetime values.
-5. Removes readings after the known sensor failure cutoff.
-6. Removes extreme raw light and solar readings above the configured threshold.
-7. Detects suspicious timestamp gaps and duplicate-like measurements.
-8. Cleans timestamp spacing and interpolates missing numeric readings.
-9. Removes outliers using z-score filtering.
-10. Removes additional outliers using an IQR-based rule.
-11. Re-interpolates after outlier removal to restore a regular time series.
-12. Plots cleaned sensor signals.
-13. Computes initial sensor correlations.
-14. Engineers rolling, lag, delta, diurnal, statistical, cross-sensor, and IQR features.
-15. Evaluates feature importance with correlation, ANOVA F-score, mutual information, and random forest importance.
-16. Saves correlation and diagnostic plots.
-17. Builds future targets for temperature, humidity, and light.
-18. Trains a multi-output linear regression model with time-series cross-validation.
-19. Saves fold-level prediction plots and model metrics.
-20. Runs SARIMAX forecasting with exogenous variables.
-21. Exports SARIMAX evaluation results to Excel.
+1. MongoDB ingestion.
+2. Timestamp normalization and gap repair.
+3. Outlier removal with z-score and IQR rules.
+4. Interpolation of missing numeric measurements.
+5. Feature engineering for temporal, rolling, lag, and cross-sensor behavior.
+6. Correlation and feature-importance analysis.
+7. Forecasting with time-series cross-validation.
+8. Export of plots, metrics, and Excel reports.
 
 ## Data Source
 
-The notebook expects the source data to be stored in a MongoDB collection. Each document should represent one sensor measurement.
-
-The expected fields are:
+The notebook expects one MongoDB document per sensor measurement with these fields:
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -51,7 +32,7 @@ The expected fields are:
 | `solar_raw` | numeric | Raw solar sensor reading |
 | `battery_v` | numeric | Sensor battery voltage |
 
-The notebook reads all documents from the configured collection and excludes `_id`:
+MongoDB `_id` values are excluded during loading:
 
 ```python
 cursor = input.find({}, {"_id": 0})
@@ -331,227 +312,55 @@ Run > Restart Kernel and Run All Cells
 
 ## Generated Files
 
-The notebook may generate the following artifacts.
+The notebook may generate:
 
-### Cached Pipeline Output
-
-```text
-pipeline_results.pkl
-```
-
-This stores feature matrices, correlation matrices, and feature scoring results so the expensive feature-analysis pipeline does not need to be recomputed every time.
-
-### Correlation And Diagnostic Plots
-
-```text
-01_raw_timeseries.png
-02_corr_heatmap_pearson.png
-02_corr_heatmap_spearman.png
-03_sensor_corr_heatmap.png
-05_diurnal_boxplots.png
-```
-
-These visualize raw time-series behavior, feature correlations, raw sensor correlations, and hourly sensor distributions.
-
-### Linear Regression Forecasting Outputs
-
-For each target and fold, the notebook saves prediction plots such as:
-
-```text
-target_temp_fold_1_pred.png
-target_humidity_fold_1_pred.png
-target_light_fold_1_pred.png
-```
-
-It also saves full prediction summaries:
-
-```text
-target_temp_predicted_summary.png
-target_humidity_predicted_summary.png
-target_light_predicted_summary.png
-```
-
-The regression metrics are exported to:
-
-```text
-time_series_metrics.xlsx
-```
-
-### SARIMAX Outputs
-
-SARIMAX fold-level scores are exported to:
-
-```text
-sarimax.xlsx
-```
+| File | Purpose |
+| --- | --- |
+| `pipeline_results.pkl` | Cached feature matrices, correlations, and feature scores |
+| `01_raw_timeseries.png` | Raw sensor time-series plot |
+| `02_corr_heatmap_pearson.png` | Pearson feature-correlation heatmap |
+| `02_corr_heatmap_spearman.png` | Spearman feature-correlation heatmap |
+| `03_sensor_corr_heatmap.png` | Raw sensor correlation heatmap |
+| `05_diurnal_boxplots.png` | Hourly sensor distribution plots |
+| `target_*_fold_*_pred.png` | Fold-level regression prediction plots |
+| `target_*_predicted_summary.png` | Full prediction summaries |
+| `time_series_metrics.xlsx` | Linear regression metrics |
+| `sarimax.xlsx` | SARIMAX metrics |
 
 ## Feature Engineering Details
 
-The notebook creates several feature families.
+The notebook builds a compact but rich feature space:
 
-### Rolling Features
-
-For each sensor column, rolling features are computed over time windows:
-
-```text
-15 minutes
-60 minutes
-360 minutes
-```
-
-For each window, the notebook computes:
-
-```text
-rolling mean
-rolling standard deviation
-rolling range
-```
-
-### Lag Features
-
-Lag features preserve previous measurements:
-
-```text
-lag 1
-lag 5
-lag 15
-```
-
-These help the model learn temporal dependence.
-
-### Delta Features
-
-The notebook computes first-order and second-order changes:
-
-```text
-delta1
-delta2
-```
-
-These capture short-term movement and acceleration in the signal.
-
-### Diurnal Features
-
-The notebook encodes time-of-day behavior with:
-
-```text
-hour_sin
-hour_cos
-day_of_week
-is_daytime
-hour_bin
-```
-
-The sine and cosine features preserve the circular nature of daily time.
-
-### Statistical Features
-
-For one-hour rolling windows, the notebook computes:
-
-```text
-skewness
-kurtosis
-coefficient of variation
-```
-
-These describe distribution shape and local volatility.
-
-### Cross-Sensor Features
-
-The notebook derives physically motivated features:
-
-```text
-heat_index_proxy
-solar_efficiency
-battery_drain_rate
-humidity_temp_interaction
-```
-
-These combine sensors into higher-level indicators.
-
-### IQR Features
-
-Rolling interquartile range features are computed for multiple windows to quantify local spread and variability.
+| Feature family | Examples |
+| --- | --- |
+| Rolling windows | mean, standard deviation, range over 15, 60, and 360 minutes |
+| Lag features | previous values at lag 1, 5, and 15 |
+| Delta features | first-order and second-order differences |
+| Diurnal features | `hour_sin`, `hour_cos`, `day_of_week`, `is_daytime`, `hour_bin` |
+| Statistical features | rolling skewness, kurtosis, coefficient of variation |
+| Cross-sensor features | heat index proxy, solar efficiency, battery drain rate |
+| IQR features | rolling interquartile range across multiple windows |
 
 ## Modeling Approach
 
-### Linear Regression With Time-Series Cross-Validation
+### Linear Regression
 
-The notebook predicts future values of:
+The notebook predicts future `temperature_c`, `humidity_percent`, and `light_raw` values with multi-output linear regression. Targets are shifted by `horizon = 100`, and evaluation uses `TimeSeriesSplit(n_splits=6)`.
 
-```text
-temperature_c
-humidity_percent
-light_raw
-```
+Reported metrics include MAE, MSE, RMSE, train/test R2, median absolute error, explained variance, max error, residual mean, and overfitting gap.
 
-using a multi-output linear regression model.
+### SARIMAX
 
-The targets are shifted forward by `horizon = 100`, and the data is evaluated with:
+The notebook also fits SARIMAX models for the same three sensor targets using exogenous variables such as `solar_raw`, `battery_v`, cyclical time features, and lagged sensor values.
 
-```python
-TimeSeriesSplit(n_splits=6)
-```
-
-This preserves chronological ordering and avoids training on future data.
-
-Metrics include:
-
-```text
-MAE
-MSE
-RMSE
-Train R2
-Test R2
-Median Absolute Error
-Explained Variance
-Max Error
-Residual Mean
-Overfitting gap
-```
-
-### SARIMAX With Exogenous Variables
-
-The notebook also evaluates SARIMAX models for:
-
-```text
-temperature_c
-humidity_percent
-light_raw
-```
-
-The exogenous variables are:
-
-```text
-solar_raw
-battery_v
-time_sin
-time_cos
-temp_lag_1
-humidity_lag_1
-light_lag_1
-```
-
-The configured SARIMAX order is:
+Configuration:
 
 ```python
 order=(2, 0, 1)
-```
-
-The SARIMAX evaluation uses:
-
-```python
 TimeSeriesSplit(n_splits=5, test_size=300)
 ```
 
-and reports:
-
-```text
-MAE
-MSE
-RMSE
-R2
-```
+Reported metrics: MAE, MSE, RMSE, and R2.
 
 ## Recommended Workflow For New Experiments
 
@@ -678,4 +487,4 @@ __pycache__/
 
 ## Project Summary
 
-This notebook is a complete IoT time-series preparation and forecasting pipeline. It is especially suited for environmental sensor data where measurements arrive at near-regular intervals, contain occasional missing packets, and benefit from temporal feature engineering. The result is a reproducible analysis path from raw MongoDB records to cleaned signals, interpretable features, visual diagnostics, and model evaluation artifacts.
+This notebook turns raw MongoDB IoT measurements into cleaned signals, engineered features, diagnostic plots, and forecasting benchmarks for environmental sensor data.
