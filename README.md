@@ -21,7 +21,7 @@ Core stages  :
 
 ## Data Source
 
-The notebook expects one MongoDB document per sensor measurement with these fields:
+The notebook expects one MongoDB document per sensor measurement with these fields
 
 | Column | Type | Description |
 | --- | --- | --- |
