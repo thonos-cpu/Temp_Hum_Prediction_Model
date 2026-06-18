@@ -24,57 +24,80 @@ jobs:
           model: gpt-4o 
           prompt: |
             You are an expert developer fixing an issue in this repository.
-            Analyze the issue details below, look at the codebase context, and provide the complete fixed file content for the file that needs changing.
+            Analyze the issue details below, look at the codebase context, and fix it.
             
             Issue Title: ${{ github.event.issue.title }}
             Issue Body: ${{ github.event.issue.body }}
 
-            CRITICAL: Your entire response must be a single, valid JSON object with exactly three keys: "explanation", "file_path", and "file_content". 
-            Do not wrap the JSON in markdown code blocks. The "file_content" must be the complete, full text of the file after the fix is applied.
-            
-            Example format:
-            {
-              "explanation": "I fixed the bug by adding validation to main.js.",
-              "file_path": "src/main.js",
-              "file_content": "const express = require('express');\nconst app = express();\n// ... full file code here ..."
-            }
+            CRITICAL: You must format your response exactly like this template so my automated parser can read it:
+
+            [EXPLANATION]
+            Write your short, clear explanation here of what you fixed.
+
+            [FILE_PATH]
+            path/to/the/modified/file.ext
+
+            [CODE]
+            ```
+            Paste the entire, complete contents of the modified file here. Do not skip lines.
+            ```
 
       - name: Process AI Response and Apply Fix
         id: apply-fix
+        env:
+          AI_RAW_RESPONSE: ${{ steps.inference.outputs.response }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          # Save the raw response to a file safely
-          echo '${{ steps.inference.outputs.response }}' > ai_response.json
+          # Save the response safely to a file without shell injection/quoting issues
+          cat << 'EOF' > ai_raw.txt
+          $AI_RAW_RESPONSE
+          EOF
+
+          # Clean up carriage returns just in case
+          sed -i 's/\r//' ai_raw.txt
+
+          # Parse Explanation
+          sed -n '/\[EXPLANATION\]/,/\[FILE_PATH\]/p' ai_raw.txt | sed '1d;$d' > pr_explanation.md
+
+          # Parse File Path (clean up spaces and newlines)
+          FILE_PATH=$(sed -n '/\[FILE_PATH\]/,/\[CODE\]/p' ai_raw.txt | sed '1d;$d' | tr -d '[:space:]')
           
-          # Extract values using jq
-          jq -r '.explanation' ai_response.json > pr_explanation.md
-          FILE_PATH=$(jq -r '.file_path' ai_response.json)
-          
-          # Ensure the file path isn't empty or null
-          if [ -z "$FILE_PATH" ] || [ "$FILE_PATH" = "null" ]; then
-            echo "AI did not return a valid file path."
+          if [ -z "$FILE_PATH" ]; then
+            echo "Error: AI failed to provide a readable file path."
             echo "branch_created=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Extract full file content directly into the destination file
-          jq -r '.file_content' ai_response.json > "$FILE_PATH"
+          # Parse Code Block (Extract content inside the markdown code block)
+          sed -n '/\[CODE\]/,/```/p' ai_raw.txt | sed -n '/```/,/```/p' | sed '1d;$d' > temp_code_file
+
+          # Verify if code extraction succeeded
+          if [ ! -s temp_code_file ]; then
+            echo "Error: AI failed to provide a valid code block."
+            echo "branch_created=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Ensure target directory exists and overwrite the file completely
+          mkdir -p "$(dirname "$FILE_PATH")"
+          mv temp_code_file "$FILE_PATH"
           
-          # Configure Git
+          # Configure Git safely with fallback variables
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Create branch and commit changes
-          BRANCH_NAME="ai/fix-issue-${{ github.event.issue.number }}"
+          # Force set the branch name cleanly
+          BRANCH_NAME="ai-fix-issue-$ISSUE_NUMBER"
           git checkout -b "$BRANCH_NAME"
           
           git add "$FILE_PATH"
           if ! git diff-index --quiet HEAD --; then
-            git commit -m "AI fix for #${{ github.event.issue.number }}"
+            git commit -m "AI automated fix for #$ISSUE_NUMBER"
             git push origin "$BRANCH_NAME"
             echo "branch_created=true" >> $GITHUB_OUTPUT
             echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           else
-            echo "No changes detected in the file."
+            echo "No changes detected."
             echo "branch_created=false" >> $GITHUB_OUTPUT
           fi
 
@@ -100,7 +123,7 @@ jobs:
           ## 🛠️ How I fixed this:
           $EXPLANATION
           
-          Please review the code modifications in the diff tab above!
+          Please review the modifications in the files changed tab above!
           EOF
           )
           
