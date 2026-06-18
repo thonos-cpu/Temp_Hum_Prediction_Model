@@ -24,23 +24,24 @@ jobs:
           model: gpt-4o 
           prompt: |
             You are an expert developer fixing an issue in this repository.
-            Analyze the issue details below, look at the codebase context, and fix it.
+            Analyze the issue details below, look at the codebase context, and fix it by creating or updating the necessary file.
             
             Issue Title: ${{ github.event.issue.title }}
             Issue Body: ${{ github.event.issue.body }}
 
-            CRITICAL: You must format your response exactly like this template so my automated text parser can read it. Do not use JSON.
+            CRITICAL: You must wrap your responses exactly inside the requested XML tags below. Do not include markdown code fences (```) around the file content.
 
-            [EXPLANATION]
+            <explanation>
             Write a short, clear explanation here of what you fixed.
+            </explanation>
 
-            [FILE_PATH]
-            path/to/the/modified/file.ext
+            <file_path>
+            Provide the relative path of the file to create or update (e.g., LICENSE or README.md).
+            </file_path>
 
-            [CODE]
-            ```
-            Paste the entire, complete contents of the modified file here. Do not skip lines.
-            ```
+            <file_content>
+            Paste the complete, full contents of the file here.
+            </file_content>
 
       - name: Process AI Response and Apply Fix
         id: apply-fix
@@ -48,44 +49,36 @@ jobs:
           AI_RAW_RESPONSE: ${{ steps.inference.outputs.response }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          # Use a clean heredoc delimiter to bypass single/double quote crashes
+          # Save response securely to file using a strict heredoc delimiter
           cat << 'EOF_AI' > ai_raw.txt
           $AI_RAW_RESPONSE
           EOF_AI
 
-          # Clean up any potential Windows line endings (\r)
+          # Clean up any potential carriage returns
           sed -i 's/\r//' ai_raw.txt
 
-          # Parse Explanation cleanly
-          sed -n '/\[EXPLANATION\]/,/\[FILE_PATH\]/p' ai_raw.txt | sed '1d;$d' > pr_explanation.md
-
-          # Parse File Path and strip accidental whitespaces
-          FILE_PATH=$(sed -n '/\[FILE_PATH\]/,/\[CODE\]/p' ai_raw.txt | sed '1d;$d' | tr -d '[:space:]')
+          # Parse the tags cleanly using sed
+          sed -n '/<explanation>/,/\/explanation>/p' ai_raw.txt | sed '1d;$d' > pr_explanation.md
           
+          FILE_PATH=$(sed -n '/<file_path>/,/\/file_path>/p' ai_raw.txt | sed '1d;$d' | tr -d '[:space:]')
+          sed -n '/<file_content>/,/\/file_content>/p' ai_raw.txt | sed '1d;$d' > temp_code_file
+
+          # Fallback check if the AI misformatted the path tag slightly
           if [ -z "$FILE_PATH" ] || [ "$FILE_PATH" = "null" ]; then
-            echo "Error: AI failed to provide a readable file path."
+            echo "Error: AI failed to provide a valid target file path."
             echo "branch_created=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Parse Code Block safely (extracting content inside the code fences)
-          sed -n '/\[CODE\]/,/```/p' ai_raw.txt | sed -n '/```/,/```/p' | sed '1d;$d' > temp_code_file
-
-          if [ ! -s temp_code_file ]; then
-            echo "Error: AI failed to provide a valid code block."
-            echo "branch_created=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Overwrite target file completely
+          # Ensure the target directory exists and move the file into place
           mkdir -p "$(dirname "$FILE_PATH")"
           mv temp_code_file "$FILE_PATH"
           
-          # Set up Git variables securely 
+          # Setup Git configs securely
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Hardcode the branch name structure so it can never be empty
+          # Force set the branch name cleanly using the issue number
           BRANCH_NAME="ai-fix-issue-$ISSUE_NUMBER"
           git checkout -b "$BRANCH_NAME"
           
