@@ -48,18 +48,18 @@ jobs:
           AI_RAW_RESPONSE: ${{ steps.inference.outputs.response }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          # Save the response safely to a file without shell injection/quoting issues
-          cat << 'EOF' > ai_raw.txt
-          $AI_RAW_RESPONSE
-          EOF
+          # Use a clean heredoc delimiter to bypass single/double quote crashes
+          cat << 'EOF_AI' > ai_raw.txt
+          ${{ steps.inference.outputs.response }}
+          EOF_AI
 
-          # Clean up carriage returns just in case
+          # Clean up any potential Windows line endings (\r)
           sed -i 's/\r//' ai_raw.txt
 
-          # Parse Explanation
+          # Parse Explanation cleanly
           sed -n '/\[EXPLANATION\]/,/\[FILE_PATH\]/p' ai_raw.txt | sed '1d;$d' > pr_explanation.md
 
-          # Parse File Path (clean up spaces and newlines)
+          # Parse File Path and strip accidental whitespaces
           FILE_PATH=$(sed -n '/\[FILE_PATH\]/,/\[CODE\]/p' ai_raw.txt | sed '1d;$d' | tr -d '[:space:]')
           
           if [ -z "$FILE_PATH" ]; then
@@ -68,25 +68,23 @@ jobs:
             exit 0
           fi
 
-          # Parse Code Block (Extract content inside the markdown code block)
+          # Parse Code Block safely
           sed -n '/\[CODE\]/,/```/p' ai_raw.txt | sed -n '/```/,/```/p' | sed '1d;$d' > temp_code_file
 
-          # Verify if code extraction succeeded
           if [ ! -s temp_code_file ]; then
             echo "Error: AI failed to provide a valid code block."
             echo "branch_created=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Ensure target directory exists and overwrite the file completely
+          # Overwrite target file completely
           mkdir -p "$(dirname "$FILE_PATH")"
           mv temp_code_file "$FILE_PATH"
           
-          # Configure Git safely with fallback variables
+          # Set up Git variables securely 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Force set the branch name cleanly
           BRANCH_NAME="ai-fix-issue-$ISSUE_NUMBER"
           git checkout -b "$BRANCH_NAME"
           
