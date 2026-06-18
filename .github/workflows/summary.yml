@@ -29,10 +29,10 @@ jobs:
             Issue Title: ${{ github.event.issue.title }}
             Issue Body: ${{ github.event.issue.body }}
 
-            CRITICAL: You must format your response exactly like this template so my automated parser can read it:
+            CRITICAL: You must format your response exactly like this template so my automated text parser can read it. Do not use JSON.
 
             [EXPLANATION]
-            Write your short, clear explanation here of what you fixed.
+            Write a short, clear explanation here of what you fixed.
 
             [FILE_PATH]
             path/to/the/modified/file.ext
@@ -50,7 +50,7 @@ jobs:
         run: |
           # Use a clean heredoc delimiter to bypass single/double quote crashes
           cat << 'EOF_AI' > ai_raw.txt
-          ${{ steps.inference.outputs.response }}
+          $AI_RAW_RESPONSE
           EOF_AI
 
           # Clean up any potential Windows line endings (\r)
@@ -62,13 +62,13 @@ jobs:
           # Parse File Path and strip accidental whitespaces
           FILE_PATH=$(sed -n '/\[FILE_PATH\]/,/\[CODE\]/p' ai_raw.txt | sed '1d;$d' | tr -d '[:space:]')
           
-          if [ -z "$FILE_PATH" ]; then
+          if [ -z "$FILE_PATH" ] || [ "$FILE_PATH" = "null" ]; then
             echo "Error: AI failed to provide a readable file path."
             echo "branch_created=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Parse Code Block safely
+          # Parse Code Block safely (extracting content inside the code fences)
           sed -n '/\[CODE\]/,/```/p' ai_raw.txt | sed -n '/```/,/```/p' | sed '1d;$d' > temp_code_file
 
           if [ ! -s temp_code_file ]; then
@@ -85,6 +85,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Hardcode the branch name structure so it can never be empty
           BRANCH_NAME="ai-fix-issue-$ISSUE_NUMBER"
           git checkout -b "$BRANCH_NAME"
           
