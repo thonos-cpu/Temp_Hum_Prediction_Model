@@ -2,7 +2,7 @@
 
 This repository contains a Jupyter notebook for preprocessing IoT environmental sensor data, engineering time-series features, and benchmarking forecasting models for temperature, humidity, and light.
 
-Notebook: `preproccess.ipynb`
+Notebook: `preprocess.ipynb`
 
 ## What The Notebook Does
 
@@ -142,7 +142,7 @@ If you use MongoDB Atlas, configure your connection details in the same environm
 
 ## Environment Configuration
 
-Create a file named `credentials.env` in the same folder as `preproccess.ipynb`.
+Create a file named `credentials.env` in the same folder as `preprocess.ipynb`.
 
 For a local MongoDB server without authentication:
 
@@ -287,7 +287,7 @@ jupyter notebook
 Then open:
 
 ```text
-preproccess.ipynb
+preprocess.ipynb
 ```
 
 Select the kernel:
@@ -467,7 +467,7 @@ A clean GitHub version of this project could use:
 ```text
 .
 ├── README.md
-├── preproccess.ipynb
+├── preprocess.ipynb
 ├── requirements.txt
 ├── .gitignore
 └── examples/
